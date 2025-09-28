@@ -1,63 +1,78 @@
 import { IChat } from './base'
-import GoogleAI, { FileDataPart, FunctionDeclarationsTool, GoogleGenerativeAI, TextPart } from '@google/generative-ai'
+import GoogleAI, {
+  FileDataPart,
+  FunctionDeclarationsTool,
+  GoogleGenerativeAI,
+  TextPart
+} from '@google/generative-ai'
 import OpenAI from 'openai'
 import { toString } from 'lodash-es'
-import mime from 'mime/lite'
+import mime from 'mime'
 
 export function google(env: Record<string, string>): IChat {
   function createClient(req: OpenAI.ChatCompletionCreateParams) {
     const genAI = new GoogleGenerativeAI(env.GOOGLE_GEN_AI_API_KEY)
     if (req.response_format && req.response_format.type !== 'json_schema') {
-      throw new Error('Unsupported response format, only json_schema is supported')
+      throw new Error(
+        'Unsupported response format, only json_schema is supported'
+      )
     }
     const model = genAI.getGenerativeModel({
       model: req.model,
       generationConfig: {
         temperature: req.temperature!,
         maxOutputTokens: req.max_completion_tokens!,
-        responseSchema: req.response_format?.type === 'json_schema' ? req.response_format.json_schema : undefined,
-        topP: req.top_p!,
-      },
+        responseSchema:
+          req.response_format?.type === 'json_schema'
+            ? req.response_format.json_schema
+            : undefined,
+        topP: req.top_p!
+      }
     })
     return model
   }
-  function parseRequest(req: OpenAI.ChatCompletionCreateParams): GoogleAI.GenerateContentRequest {
+  function parseRequest(
+    req: OpenAI.ChatCompletionCreateParams
+  ): GoogleAI.GenerateContentRequest {
     const systemInstruction = () => {
-      const system = req.messages.find((m) => m.role === 'system')?.content
+      const system = req.messages.find(m => m.role === 'system')?.content
       if (!system) {
         return undefined
       }
-      return typeof system === 'string' ? system : system.map((s) => s.text).join('')
+      return typeof system === 'string'
+        ? system
+        : system.map(s => s.text).join('')
     }
 
     const tools = () => {
       if (!req.tools) {
         return undefined
       }
+      const functions = req.tools!.filter(t => t.type === 'function')
       return [
         {
-          functionDeclarations: req.tools?.map(
-            (tool) =>
+          functionDeclarations: functions.map(
+            tool =>
               ({
                 name: tool.function.name,
                 description: tool.function.description,
-                parameters: tool.function.parameters,
-              }) as GoogleAI.Tool,
-          ),
-        } as FunctionDeclarationsTool,
+                parameters: tool.function.parameters
+              }) as GoogleAI.Tool
+          )
+        } as FunctionDeclarationsTool
       ]
     }
 
     return {
       systemInstruction: systemInstruction(),
       contents: req.messages.map(
-        (m) =>
+        m =>
           ({
             role: m.role === 'assistant' ? 'model' : 'user',
             parts:
               typeof m.content === 'string'
                 ? [{ text: m.content }]
-                : m.content!.map((c) => {
+                : m.content!.map(c => {
                     if (c.type === 'text') {
                       return { text: c.text } satisfies TextPart
                     }
@@ -65,28 +80,28 @@ export function google(env: Record<string, string>): IChat {
                       return {
                         fileData: {
                           fileUri: c.image_url.url,
-                          mimeType: 'image/png',
-                        },
+                          mimeType: 'image/png'
+                        }
                       } satisfies FileDataPart
                     }
                     if (c.type === 'file') {
                       return {
                         fileData: {
                           fileUri: c.file.file_data!,
-                          mimeType: mime.getType(c.file.filename!)!,
-                        },
+                          mimeType: mime.getType(c.file.filename!)!
+                        }
                       } satisfies FileDataPart
                     }
                     throw new Error('Unsupported content type: ' + c.type)
-                  }),
-          }) as GoogleAI.Content,
+                  })
+          }) as GoogleAI.Content
       ),
-      tools: tools(),
+      tools: tools()
     }
   }
   function parseResponse(
     response: GoogleAI.EnhancedGenerateContentResponse,
-    req: OpenAI.ChatCompletionCreateParams,
+    req: OpenAI.ChatCompletionCreateParams
   ): OpenAI.ChatCompletion {
     let index = 0
     return {
@@ -102,26 +117,26 @@ export function google(env: Record<string, string>): IChat {
             content: response.text(),
             refusal: null,
             tool_calls: response.functionCalls()?.map(
-              (it) =>
+              it =>
                 ({
                   id: toString(index++),
                   function: {
                     arguments: it.args as any,
-                    name: it.name,
-                  } as OpenAI.ChatCompletionMessageToolCall.Function,
-                  type: 'function',
-                }) as OpenAI.ChatCompletionMessageToolCall,
-            ),
+                    name: it.name
+                  } as OpenAI.ChatCompletionMessageFunctionToolCall.Function,
+                  type: 'function'
+                }) as OpenAI.ChatCompletionMessageToolCall
+            )
           },
           logprobs: null,
-          finish_reason: 'stop',
-        },
+          finish_reason: 'stop'
+        }
       ],
       usage: {
         prompt_tokens: response.usageMetadata!.promptTokenCount,
         completion_tokens: response.usageMetadata!.candidatesTokenCount,
-        total_tokens: response.usageMetadata!.totalTokenCount,
-      },
+        total_tokens: response.usageMetadata!.totalTokenCount
+      }
     }
   }
   return {
@@ -146,11 +161,13 @@ export function google(env: Record<string, string>): IChat {
       'gemini-1.5-pro',
       'gemini-embedding-exp',
       'gemini-2.0-flash-live-001',
-      'gemini-2.5-flash-live-preview',
+      'gemini-2.5-flash-live-preview'
     ],
     requiredEnv: ['GOOGLE_GEN_AI_API_KEY'],
     async invoke(req) {
-      const { response } = await createClient(req).generateContent(parseRequest(req))
+      const { response } = await createClient(req).generateContent(
+        parseRequest(req)
+      )
       return parseResponse(response, req)
     },
     async *stream(req) {
@@ -162,7 +179,7 @@ export function google(env: Record<string, string>): IChat {
         id,
         object: 'chat.completion.chunk',
         created: Math.floor(Date.now() / 1000),
-        model: req.model,
+        model: req.model
       })
       for await (const chunk of stream.stream) {
         last = chunk
@@ -173,11 +190,11 @@ export function google(env: Record<string, string>): IChat {
               index: 0,
               delta: {
                 content: chunk.text(),
-                tool_calls: chunk.functionCalls(),
+                tool_calls: chunk.functionCalls()
               },
-              finish_reason: null,
-            },
-          ],
+              finish_reason: null
+            }
+          ]
         } as OpenAI.ChatCompletionChunk
       }
       if (!last) {
@@ -191,8 +208,8 @@ export function google(env: Record<string, string>): IChat {
           usage: {
             prompt_tokens: last.usageMetadata!.promptTokenCount,
             completion_tokens: last.usageMetadata!.candidatesTokenCount,
-            total_tokens: last.usageMetadata!.totalTokenCount,
-          },
+            total_tokens: last.usageMetadata!.totalTokenCount
+          }
         } as OpenAI.ChatCompletionChunk
       } else {
         yield {
@@ -201,11 +218,11 @@ export function google(env: Record<string, string>): IChat {
             {
               index: 0,
               delta: {},
-              finish_reason: 'stop',
-            },
-          ],
+              finish_reason: 'stop'
+            }
+          ]
         } as OpenAI.ChatCompletionChunk
       }
-    },
+    }
   }
 }

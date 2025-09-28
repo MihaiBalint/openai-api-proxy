@@ -6,24 +6,26 @@ import Anthropic from '@anthropic-ai/sdk'
 import { HTTPException } from 'hono/http-exception'
 
 export interface IAnthropicVertex extends IChat {
-  parseRequest(req: OpenAI.ChatCompletionCreateParams): Promise<AnthropicTypes.MessageCreateParams>
+  parseRequest(
+    req: OpenAI.ChatCompletionCreateParams
+  ): Promise<AnthropicTypes.MessageCreateParams>
   parseResponse(resp: AnthropicTypes.Messages.Message): OpenAI.ChatCompletion
 }
 
 function convertToolChoice(
-  tool_choice?: OpenAI.ChatCompletionToolChoiceOption,
+  tool_choice?: OpenAI.ChatCompletionToolChoiceOption
 ): AnthropicTypes.MessageCreateParams['tool_choice'] | undefined {
   if (!tool_choice) {
     return
   }
   if (tool_choice === 'auto') {
     return {
-      type: 'auto',
+      type: 'auto'
     }
   }
   if (tool_choice === 'required') {
     return {
-      type: 'any',
+      type: 'any'
     }
   }
   if (tool_choice === 'none') {
@@ -31,7 +33,7 @@ function convertToolChoice(
   }
   return {
     type: 'tool',
-    name: tool_choice.function.name,
+    name: (tool_choice as any).function.name // TODO: fixed borked typing following outdated openai sdk
   }
 }
 
@@ -61,18 +63,18 @@ export async function getImageAsBase64(imageUrl: string): Promise<{
   const base64 = arrayBufferToBase64(arrayBuffer)
   return {
     media_type: response.headers.get('content-type') || 'image/jpeg',
-    data: base64,
+    data: base64
   }
 }
 
 async function convertMessages(
-  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
 ): Promise<AnthropicTypes.MessageCreateParamsNonStreaming['messages']> {
   return Promise.all(
-    messages.map(async (it) => {
+    messages.map(async it => {
       if (!it.content) {
         throw new HTTPException(400, {
-          message: 'content is required',
+          message: 'content is required'
         })
       }
       if (typeof it.content === 'string') {
@@ -81,11 +83,11 @@ async function convertMessages(
       return {
         role: it.role,
         content: await Promise.all(
-          it.content.map(async (it) => {
+          it.content.map(async it => {
             if (it.type === 'text') {
               return {
                 type: 'text',
-                text: it.text,
+                text: it.text
               } as AnthropicTypes.TextBlockParam
             }
             if (it.type === 'image_url') {
@@ -93,17 +95,17 @@ async function convertMessages(
                 type: 'image',
                 source: {
                   type: 'base64',
-                  ...(await getImageAsBase64(it.image_url.url)),
-                },
+                  ...(await getImageAsBase64(it.image_url.url))
+                }
               } as AnthropicTypes.ImageBlockParam
             }
             throw new HTTPException(400, {
-              message: 'Unsupported message content type ' + it.type,
+              message: 'Unsupported message content type ' + it.type
             })
-          }),
-        ),
+          })
+        )
       } as AnthropicTypes.MessageParam
-    }),
+    })
   )
 }
 
@@ -115,42 +117,53 @@ function getModelMaxTokens(model: string): number {
 }
 
 export function anthropicBase(
-  createClient: () => AnthropicTypes,
+  createClient: () => AnthropicTypes
 ): Omit<IAnthropicVertex, 'requiredEnv' | 'supportModels'> {
   return {
     name: 'vertex-anthropic',
     async parseRequest(req) {
+      const functions = req.tools?.filter(t => t.type === 'function')
       let r: AnthropicTypes.MessageCreateParamsNonStreaming = {
         stream: false,
-        stop_sequences: typeof req.stop === 'string' ? [req.stop] : Array.isArray(req.stop) ? req.stop : undefined,
-        system: req.messages.find((it) => it.role === 'system')?.content,
+        stop_sequences:
+          typeof req.stop === 'string'
+            ? [req.stop]
+            : Array.isArray(req.stop)
+              ? req.stop
+              : undefined,
+        system: req.messages.find(it => it.role === 'system')?.content,
         model: req.model,
         messages: await convertMessages(
-          req.messages.filter((it) =>
-            (['user', 'assistant'] as OpenAI.ChatCompletionMessageParam['role'][]).includes(it.role),
-          ),
+          req.messages.filter(it =>
+            (
+              [
+                'user',
+                'assistant'
+              ] as OpenAI.ChatCompletionMessageParam['role'][]
+            ).includes(it.role)
+          )
         ),
         max_tokens: req.max_completion_tokens ?? getModelMaxTokens(req.model),
         temperature: req.temperature!,
         metadata: {
-          user_id: req.user,
+          user_id: req.user
         },
-        tools: req.tools?.map(
-          (it) =>
+        tools: functions?.map(
+          it =>
             ({
               name: it.function.name,
               description: it.function.description,
-              input_schema: it.function.parameters,
-            }) as AnthropicTypes.Tool,
+              input_schema: it.function.parameters
+            }) as AnthropicTypes.Tool
         ),
-        tool_choice: convertToolChoice(req.tool_choice),
+        tool_choice: convertToolChoice(req.tool_choice)
       }
       if (!req.stream) {
         return r
       }
       return {
         ...r,
-        stream: true,
+        stream: true
       } as AnthropicTypes.MessageCreateParamsStreaming
     },
     parseResponse(resp) {
@@ -162,7 +175,7 @@ export function anthropicBase(
         usage: {
           prompt_tokens: resp.usage.input_tokens,
           completion_tokens: resp.usage.output_tokens,
-          total_tokens: resp.usage.input_tokens + resp.usage.output_tokens,
+          total_tokens: resp.usage.input_tokens + resp.usage.output_tokens
         },
         choices: resp.content.map((it: AnthropicTypes.ContentBlock) => {
           return {
@@ -180,28 +193,32 @@ export function anthropicBase(
                         type: 'function',
                         function: {
                           name: it.name,
-                          arguments: it.input,
-                        },
-                      },
-                    ],
+                          arguments: it.input
+                        }
+                      }
+                    ]
             },
             finish_reason: 'stop',
-            logprobs: null,
+            logprobs: null
           }
-        }),
+        })
       } as OpenAI.ChatCompletion
     },
     async invoke(req) {
       const client = createClient()
       return this.parseResponse(
-        await client.messages.create((await this.parseRequest(req)) as AnthropicTypes.MessageCreateParamsNonStreaming),
+        await client.messages.create(
+          (await this.parseRequest(
+            req
+          )) as AnthropicTypes.MessageCreateParamsNonStreaming
+        )
       )
     },
     async *stream(req, signal) {
       const client = createClient()
       const stream = await client.messages.create({
         ...(await this.parseRequest(req)),
-        stream: true,
+        stream: true
       })
       signal.onabort = () => stream.controller.abort()
       const chunks: AnthropicTypes.Messages.RawMessageStreamEvent[] = []
@@ -212,7 +229,7 @@ export function anthropicBase(
           id: start!.id,
           model: start!.model,
           object: 'chat.completion.chunk',
-          created: Math.floor(Date.now() / 1000),
+          created: Math.floor(Date.now() / 1000)
         })
         if (it.type === 'message_start') {
           start = it.message
@@ -226,10 +243,10 @@ export function anthropicBase(
               {
                 index: it.index,
                 delta: {
-                  content: it.delta.text,
-                },
-              },
-            ],
+                  content: it.delta.text
+                }
+              }
+            ]
           } as OpenAI.ChatCompletionChunk
         } else if (it.type === 'message_delta') {
           if (req.stream_options?.include_usage) {
@@ -239,8 +256,9 @@ export function anthropicBase(
               usage: {
                 prompt_tokens: start!.usage.input_tokens,
                 completion_tokens: it!.usage.output_tokens,
-                total_tokens: start!.usage.input_tokens + it!.usage.output_tokens,
-              },
+                total_tokens:
+                  start!.usage.input_tokens + it!.usage.output_tokens
+              }
             } as OpenAI.ChatCompletionChunk
           } else {
             yield {
@@ -249,14 +267,14 @@ export function anthropicBase(
                 {
                   index: 0,
                   delta: {},
-                  finish_reason: 'stop',
-                },
-              ],
+                  finish_reason: 'stop'
+                }
+              ]
             } as OpenAI.ChatCompletionChunk
           }
         }
       }
-    },
+    }
   }
 }
 
@@ -266,7 +284,7 @@ export function anthropicVertex(env: Record<string, string>): IAnthropicVertex {
       clientEmail: env.VERTEX_ANTROPIC_GOOGLE_SA_CLIENT_EMAIL,
       privateKey: env.VERTEX_ANTROPIC_GOOGLE_SA_PRIVATE_KEY,
       region: env.VERTEX_ANTROPIC_REGION,
-      projectId: env.VERTEX_ANTROPIC_PROJECTID,
+      projectId: env.VERTEX_ANTROPIC_PROJECTID
     })
   const r = anthropicBase(createClient as any) as IAnthropicVertex
   r.name = 'vertex-anthropic'
@@ -274,7 +292,7 @@ export function anthropicVertex(env: Record<string, string>): IAnthropicVertex {
     'VERTEX_ANTROPIC_GOOGLE_SA_CLIENT_EMAIL',
     'VERTEX_ANTROPIC_GOOGLE_SA_PRIVATE_KEY',
     'VERTEX_ANTROPIC_REGION',
-    'VERTEX_ANTROPIC_PROJECTID',
+    'VERTEX_ANTROPIC_PROJECTID'
   ]
   r.supportModels = [
     'claude-opus-4-1@20250805',
@@ -286,7 +304,7 @@ export function anthropicVertex(env: Record<string, string>): IAnthropicVertex {
     'claude-3-5-sonnet@20240620',
     'claude-3-haiku@20240307',
     'claude-3-opus@20240229',
-    'claude-3-sonnet@20240229',
+    'claude-3-sonnet@20240229'
   ]
   return r
 }
@@ -307,7 +325,7 @@ export function anthropic(env: Record<string, string>): IAnthropicVertex {
     'claude-3-5-sonnet-20240620',
     'claude-3-opus-20240229',
     'claude-3-sonnet-20240229',
-    'claude-3-haiku-20240307',
+    'claude-3-haiku-20240307'
   ]
   return r
 }
