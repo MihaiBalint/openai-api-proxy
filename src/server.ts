@@ -1,5 +1,5 @@
 import { serve } from '@hono/node-server'
-import app from './index.js'
+import app, { createEnvContext } from './index.js'
 import * as dotenv from 'dotenv'
 
 // Load environment variables from .env file
@@ -10,6 +10,10 @@ const port = parseInt(process.env.PORT || '3000', 10)
 console.log(`Server is running on port ${port}`)
 
 serve({
-  fetch: app.fetch,
+  fetch: (request: Request) => {
+    // Use the createEnvContext function to provide environment variables
+    const envContext = createEnvContext()
+    return app.fetch(request, envContext.env)
+  },
   port
 })

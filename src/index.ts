@@ -11,7 +11,7 @@ export interface Bindings {
 }
 
 // Create a context that uses environment variables for Node.js
-const createEnvContext = () => ({
+export const createEnvContext = () => ({
   env: {
     API_KEY: process.env.API_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
