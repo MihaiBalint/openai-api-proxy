@@ -69,7 +69,29 @@ npm run build
 npm start
 ```
 
+For a single bundled file (includes all dependencies):
+
+```bash
+npm run bundle
+npm run start:bundle
+```
+
+Or run directly:
+
+```bash
+./dist/server.bundle.js
+```
+
 The server will start on port 3000 by default (configurable via `PORT` environment variable).
+
+### Bundle Build
+
+The `npm run bundle` command creates a single, minified JavaScript file (`dist/server.bundle.js`) that includes all dependencies. This is perfect for deployment scenarios where you want a single executable file:
+
+- **Size**: ~1.9MB (all dependencies included)
+- **Executable**: Can be run directly with `./dist/server.bundle.js`
+- **Portable**: No need to install node_modules on the target server
+- **Minified**: Optimized for production use
 
 ## Configuration
 

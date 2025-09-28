@@ -5,6 +5,8 @@
     "dev": "tsx src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc",
+    "bundle": "node build.mjs",
+    "start:bundle": "node dist/server.bundle.js",
     "test": "vitest run",
     "lint-staged": "lint-staged",
     "postinstall": "npx simple-git-hooks"
@@ -38,6 +40,7 @@
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^22.0.0",
     "dotenv": "^16.5.0",
+    "esbuild": "^0.24.0",
     "google-auth-library": "^9.14.1",
     "lint-staged": "^16.1.0",
     "prettier": "^3.5.3",

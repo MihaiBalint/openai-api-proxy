@@ -70,7 +70,29 @@ npm run build
 npm start
 ```
 
+单文件打包版本（包含所有依赖）:
+
+```bash
+npm run bundle
+npm run start:bundle
+```
+
+或直接运行:
+
+```bash
+./dist/server.bundle.js
+```
+
 服务器默认在端口 3000 启动（可通过 `PORT` 环境变量配置）。
+
+### 打包构建
+
+`npm run bundle` 命令创建一个单独的、压缩的 JavaScript 文件（`dist/server.bundle.js`），包含所有依赖项。这对于需要单个可执行文件的部署场景非常完美：
+
+- **大小**: ~1.9MB（包含所有依赖项）
+- **可执行**: 可以直接用 `./dist/server.bundle.js` 运行
+- **便携**: 无需在目标服务器上安装 node_modules
+- **压缩**: 为生产使用而优化
 
 ## 配置
 
