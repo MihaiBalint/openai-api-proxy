@@ -132,6 +132,7 @@ Environment variables
   - `OLLAMA_BASE_URL`: Ollama Base URL, e.g. `http://localhost:11434/v1`
   - `OLLAMA_MODELS`: Ollama Models, e.g. `deepseek-r1,lama3.3:70b,phi4:latest`
 - OpenRouter: Supports OpenRouter models, e.g. `openai/gpt-4o-mini`
+  - `OPENROUTER_BASE_URL`: OpenRouter base URL, e.g. `https://openrouter.ai/api/v1` also vLLM compatible, e.g. `http://localhost:8000/v1`
   - `OPENROUTER_API_KEY`: OpenRouter API Key
   - `OPENROUTER_MODELS`: OpenRouter Models, e.g. `openai/gpt-4o-mini,anthropic/claude-3-5-sonnet-20240620`
 - Grok: Supports grok3 models, e.g. `grok-3-latest`, `grok-3-mini-latest`

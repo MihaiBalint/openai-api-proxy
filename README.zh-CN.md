@@ -138,6 +138,7 @@ npm run start:bundle
   - `OLLAMA_MODELS`: Ollama Models, 例如 `deepseek-r1,lama3.3:70b,phi4:latest`
 - OpenRouter: 支持 OpenRouter 模型，例如 `openai/gpt-4o-mini`
   - `OPENROUTER_API_KEY`: OpenRouter API Key
+  - `OPENROUTER_BASE_URL`: OpenRouter base URL, 例如 `https://openrouter.ai/api/v1` also vLLM compatible, 例如 `http://localhost:8000/v1`
   - `OPENROUTER_MODELS`: OpenRouter Models, 例如 `openai/gpt-4o-mini,anthropic/claude-3-5-sonnet-20240620`
 - Grok: 支持 grok3 系列模型, e.g. `grok-3-latest`, `grok-3-mini-latest`
   - `GROK_API_KEY`: Grok API key

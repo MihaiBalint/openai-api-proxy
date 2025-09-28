@@ -38,6 +38,7 @@ const createEnvContext = () => ({
     ALIYUN_BAILIAN_MODELS: process.env.ALIYUN_BAILIAN_MODELS,
     OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,
     OLLAMA_MODELS: process.env.OLLAMA_MODELS,
+    OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
     OPENROUTER_MODELS: process.env.OPENROUTER_MODELS,
     GROK_API_KEY: process.env.GROK_API_KEY,
