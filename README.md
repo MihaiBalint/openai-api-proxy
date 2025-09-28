@@ -24,9 +24,54 @@ Supported models
 - [ ] Cloudflare Workers AI
 - [ ] Coze
 
-## Deployment
+## Installation and Setup
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/rxliuli/openai-api-proxy)
+### Prerequisites
+
+- Node.js 18 or higher
+- npm
+
+### Installation
+
+1. Clone the repository:
+
+```bash
+git clone https://github.com/rxliuli/openai-api-proxy.git
+cd openai-api-proxy
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Create environment configuration:
+
+```bash
+cp env.example .env
+```
+
+4. Edit `.env` file and add your API keys and configuration.
+
+### Running the Server
+
+For development:
+
+```bash
+npm run dev
+```
+
+For production:
+
+```bash
+npm run build
+npm start
+```
+
+The server will start on port 3000 by default (configurable via `PORT` environment variable).
+
+## Configuration
 
 Environment variables
 
@@ -113,12 +158,12 @@ And it can be used in OpenAI's official SDK, for example:
 ```ts
 const openai = new OpenAI({
   baseURL: 'http://localhost:8787/v1',
-  apiKey: '$API_KEY',
+  apiKey: '$API_KEY'
 })
 
 const response = await openai.chat.completions.create({
   model: 'gpt-4o-mini',
-  messages: [{ role: 'user', content: 'Hello, world!' }],
+  messages: [{ role: 'user', content: 'Hello, world!' }]
 })
 
 console.log(response)

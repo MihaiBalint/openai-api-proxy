@@ -1,8 +1,0 @@
-{
-  "name": "openai-api-proxy",
-  "main": "src/index.ts",
-  "compatibility_date": "2024-08-22",
-  "observability": {
-    "enabled": true
-  }
-}

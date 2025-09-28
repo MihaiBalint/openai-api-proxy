@@ -25,9 +25,54 @@
 - [ ] Coze
 - [ ] 豆包
 
-## 部署
+## 安装和设置
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/rxliuli/openai-api-proxy)
+### 前置要求
+
+- Node.js 18 或更高版本
+- npm
+
+### 安装
+
+1. 克隆仓库:
+
+```bash
+git clone https://github.com/rxliuli/openai-api-proxy.git
+cd openai-api-proxy
+```
+
+2. 安装依赖:
+
+```bash
+npm install
+```
+
+3. 创建环境配置:
+
+```bash
+cp env.example .env
+```
+
+4. 编辑 `.env` 文件并添加您的 API 密钥和配置。
+
+### 运行服务器
+
+开发环境:
+
+```bash
+npm run dev
+```
+
+生产环境:
+
+```bash
+npm run build
+npm start
+```
+
+服务器默认在端口 3000 启动（可通过 `PORT` 环境变量配置）。
+
+## 配置
 
 环境变量
 
@@ -118,12 +163,12 @@ curl http://localhost:8787/v1/chat/completions \
 ```ts
 const openai = new OpenAI({
   baseURL: 'http://localhost:8787/v1',
-  apiKey: '$API_KEY',
+  apiKey: '$API_KEY'
 })
 
 const response = await openai.chat.completions.create({
   model: 'gpt-4o-mini',
-  messages: [{ role: 'user', content: 'Hello, world!' }],
+  messages: [{ role: 'user', content: 'Hello, world!' }]
 })
 
 console.log(response)
