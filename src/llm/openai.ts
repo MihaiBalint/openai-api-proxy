@@ -7,67 +7,77 @@ import {
   ResponseInputImage,
   ResponseInputText,
   ResponseOutputMessage,
-  ResponseOutputText,
+  ResponseOutputText
 } from 'openai/resources/responses/responses.mjs'
 import { Response } from 'openai/resources/responses/responses.js'
 import { HTTPException } from 'hono/http-exception'
+import { streamingResponseInterceptor } from '../interceptor'
 
 export function openaiBase(options: {
   createClient: (req: ChatCompletionCreateParams) => OpenAI | AzureOpenAI
   pre?: (req: ChatCompletionCreateParams) => ChatCompletionCreateParams
 }): IChat {
-  const pre = options.pre ?? ((req) => req)
+  const pre = options.pre ?? (req => req)
   return {
     name: 'openai',
     supportModels: [],
     requiredEnv: ['OPENAI_API_KEY'],
-    invoke(req) {
+    async invoke(req) {
       const _req = pre(req)
       const client = options.createClient(_req)
-      return client.chat.completions.create({
-        ..._req,
-        stream: false,
+      const { interceptResponse } = streamingResponseInterceptor({
+        client,
+        req
       })
+      const response = await client.chat.completions.create({
+        ..._req,
+        stream: false
+      })
+      return await interceptResponse({ response })
     },
     async *stream(req, signal) {
       const _req = pre(req)
       const client = options.createClient(_req)
+      const { interceptStream } = streamingResponseInterceptor({ client, req })
       const stream = await client.chat.completions.create({
         ..._req,
-        stream: true,
+        stream: true
       })
       for await (const it of stream) {
+        const chunk = await interceptStream({ chunk: it, signal })
         if (signal?.aborted) {
           throw new Error('Aborted')
         }
-        yield it
+        yield chunk
       }
-    },
+    }
   }
 }
 
-function openaiResponse(options: { createClient: (req: ChatCompletionCreateParams) => OpenAI | AzureOpenAI }): IChat {
+function openaiResponse(options: {
+  createClient: (req: ChatCompletionCreateParams) => OpenAI | AzureOpenAI
+}): IChat {
   function pre(
-    req: OpenAI.Chat.Completions.ChatCompletionCreateParams,
+    req: OpenAI.Chat.Completions.ChatCompletionCreateParams
   ): OpenAI.Responses.ResponseCreateParamsNonStreaming {
     return {
-      input: req.messages.map((it) => ({
+      input: req.messages.map(it => ({
         role: it.role as any,
         content:
           typeof it.content === 'string'
             ? it.content
-            : it.content!.map((c) => {
+            : it.content!.map(c => {
                 if (c.type === 'text') {
                   return {
                     type: 'input_text',
-                    text: c.text,
+                    text: c.text
                   } satisfies ResponseInputText
                 }
                 if (c.type === 'image_url') {
                   return {
                     type: 'input_image',
                     image_url: c.image_url.url,
-                    detail: c.image_url.detail ?? 'auto',
+                    detail: c.image_url.detail ?? 'auto'
                   } satisfies ResponseInputImage
                 }
                 if (c.type === 'file') {
@@ -75,16 +85,16 @@ function openaiResponse(options: { createClient: (req: ChatCompletionCreateParam
                     type: 'input_file',
                     file_id: c.file.file_id,
                     filename: c.file.filename,
-                    file_data: c.file.file_data,
+                    file_data: c.file.file_data
                   } satisfies ResponseInputFile
                 }
                 throw new Error('Unsupported content type: ' + c.type)
-              }),
+              })
       })),
       model: req.model,
       temperature: req.temperature,
       max_output_tokens: req.max_completion_tokens,
-      top_p: req.top_p,
+      top_p: req.top_p
     } satisfies OpenAI.Responses.ResponseCreateParamsNonStreaming
   }
   return {
@@ -105,18 +115,18 @@ function openaiResponse(options: { createClient: (req: ChatCompletionCreateParam
             finish_reason: 'stop',
             message: {
               role: 'assistant',
-              content: resp.output_text,
+              content: resp.output_text
             },
-            logprobs: null,
-          } as ChatCompletion.Choice,
-        ],
+            logprobs: null
+          } as ChatCompletion.Choice
+        ]
       } as ChatCompletion
     },
     async *stream(req, signal) {
       const client = options.createClient(req)
       const stream = await client.responses.create({
         ...pre(req),
-        stream: true,
+        stream: true
       })
       let response: Response
       for await (const it of stream) {
@@ -133,13 +143,13 @@ function openaiResponse(options: { createClient: (req: ChatCompletionCreateParam
                 finish_reason: null,
                 delta: {
                   role: 'assistant',
-                  content: it.response.output_text ?? '',
-                },
-              },
+                  content: it.response.output_text ?? ''
+                }
+              }
             ],
             created: it.response.created_at,
             model: it.response.model,
-            object: 'chat.completion.chunk',
+            object: 'chat.completion.chunk'
           } satisfies ChatCompletionChunk
         } else if (it.type === 'response.output_text.delta') {
           yield {
@@ -149,15 +159,15 @@ function openaiResponse(options: { createClient: (req: ChatCompletionCreateParam
                 index: it.sequence_number,
                 delta: {
                   role: 'assistant',
-                  content: it.delta,
+                  content: it.delta
                 },
                 logprobs: null,
-                finish_reason: null,
-              },
+                finish_reason: null
+              }
             ],
             created: response!.created_at,
             model: response!.model,
-            object: 'chat.completion.chunk',
+            object: 'chat.completion.chunk'
           } satisfies ChatCompletionChunk
         } else if (it.type === 'response.completed') {
           yield {
@@ -168,24 +178,24 @@ function openaiResponse(options: { createClient: (req: ChatCompletionCreateParam
                 finish_reason: 'stop',
                 delta: {
                   role: 'assistant',
-                  content: it.response.output_text ?? '',
-                },
-              },
+                  content: it.response.output_text ?? ''
+                }
+              }
             ],
             usage: {
               prompt_tokens: it.response.usage!.input_tokens,
               completion_tokens: it.response.usage!.output_tokens,
-              total_tokens: it.response.usage!.total_tokens,
+              total_tokens: it.response.usage!.total_tokens
             },
             created: it.response.created_at,
             model: it.response.model,
-            object: 'chat.completion.chunk',
+            object: 'chat.completion.chunk'
           } satisfies ChatCompletionChunk
         } else if (it.type === 'error') {
           throw new HTTPException(it.code as any, { message: it.message })
         }
       }
-    },
+    }
   }
 }
 
@@ -236,7 +246,7 @@ export function openai(env: Record<string, string>): IChat {
     'o1-mini-2024-09-12',
 
     'omni-moderation-2024-09-26',
-    'omni-moderation-latest',
+    'omni-moderation-latest'
   ]
   const newModels = [
     'gpt-5-nano',
@@ -269,11 +279,11 @@ export function openai(env: Record<string, string>): IChat {
     'o3-deep-research-2025-06-26',
     'o4-mini-deep-research-2025-06-26',
     'gpt-5-chat-latest',
-    'gpt-5-2025-08-07',
+    'gpt-5-2025-08-07'
   ]
   const client_builder = (model: string): IChat => {
     let base_client = new OpenAI({
-      apiKey: env.OPENAI_API_KEY,
+      apiKey: env.OPENAI_API_KEY
     })
     if (oldModels.includes(model)) {
       return openaiBase({ createClient: () => base_client })
@@ -285,7 +295,7 @@ export function openai(env: Record<string, string>): IChat {
     name: 'openai',
     supportModels: [...oldModels, ...newModels],
     requiredEnv: ['OPENAI_API_KEY'],
-    invoke: (req) => client_builder(req.model).invoke(req),
-    stream: (req, signal) => client_builder(req.model).stream(req, signal),
+    invoke: req => client_builder(req.model).invoke(req),
+    stream: (req, signal) => client_builder(req.model).stream(req, signal)
   }
 }
